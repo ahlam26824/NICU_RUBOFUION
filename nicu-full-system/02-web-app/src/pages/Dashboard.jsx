@@ -244,8 +244,8 @@ export default function Dashboard() {
           </p>
           <p className="text-[11px] text-muted mt-0.5 leading-relaxed">
             Simulated values, not measurements — no device is reporting. Drifts
-            every {DEMO_DRIFT_LABEL}, or tap refresh. The health ring above
-            ignores these. Live readings replace them automatically.
+            every {DEMO_DRIFT_LABEL}, or tap refresh. Live readings replace them
+            automatically.
           </p>
         </div>
       )}
