@@ -17,9 +17,18 @@
 
 export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false';
 
-// How long one set of values holds before drifting. Real vitals wander
-// slowly; re-rolling per render would look like noise, not a patient.
-export const DEMO_DRIFT_MS = 5 * 60 * 1000;
+// How long one set of values holds before drifting. Short enough that the
+// numbers visibly move while someone is watching the screen, long enough that
+// they read as a patient rather than as noise. Whoever renders these must tick
+// at least this often or the new values sit unrendered.
+export const DEMO_DRIFT_MS = 30 * 1000;
+
+// Pre-formatted for the UI banners. Math.round(ms / 60000) prints "1 min" for
+// anything at or over 30 s, so seconds need their own branch.
+export const DEMO_DRIFT_LABEL =
+  DEMO_DRIFT_MS < 60 * 1000
+    ? `${Math.round(DEMO_DRIFT_MS / 1000)} s`
+    : `${Math.round(DEMO_DRIFT_MS / 60000)} min`;
 
 // Healthy term-neonate ranges. Deliberately kept inside normal limits — the
 // demo should never manufacture an alert that sends someone looking for a

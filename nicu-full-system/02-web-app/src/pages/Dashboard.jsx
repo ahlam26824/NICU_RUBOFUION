@@ -3,7 +3,7 @@ import { Bell, Plus, RefreshCw } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { vitalStatus, STATUS } from '../lib/vitalStatus';
-import { DEMO_MODE, DEMO_DRIFT_MS, fillWithDemoVitals } from '../lib/demoVitals';
+import { DEMO_MODE, DEMO_DRIFT_MS, DEMO_DRIFT_LABEL, fillWithDemoVitals } from '../lib/demoVitals';
 import CircularProgress from '../components/CircularProgress';
 import BabyCard from '../components/BabyCard';
 import BottomNav from '../components/BottomNav';
@@ -12,6 +12,13 @@ import BottomNav from '../components/BottomNav';
 // a baby whose device goes quiet would keep showing its last known status
 // until some other event forced a re-render.
 const STALENESS_TICK_MS = 30 * 1000;
+
+// One timer drives both staleness and demo drift. It has to fire at least as
+// often as the demo bucket rolls over, otherwise fresh demo values would sit
+// computed-but-unrendered until something else caused a re-render.
+const TICK_MS = DEMO_MODE
+  ? Math.min(STALENESS_TICK_MS, DEMO_DRIFT_MS)
+  : STALENESS_TICK_MS;
 
 export default function Dashboard() {
   const { profile } = useAuth();
@@ -108,7 +115,7 @@ export default function Dashboard() {
 
   // Staleness ticker.
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), STALENESS_TICK_MS);
+    const id = setInterval(() => setTick((t) => t + 1), TICK_MS);
     return () => clearInterval(id);
   }, []);
 
@@ -173,10 +180,17 @@ export default function Dashboard() {
   const demoCount = babies.filter((b) => displayVitals[b.id]?.is_demo).length;
 
   // ---- Derived counts ----
+  // Card statuses read the demo-filled map, so a baby with no device still
+  // renders as a normal-looking card.
   const statuses = babies.map((b) => vitalStatus(displayVitals[b.id]));
-  const stableCount = statuses.filter((s) => s === STATUS.STABLE).length;
-  const abnormalCount = statuses.filter((s) => s === STATUS.ABNORMAL).length;
-  const unmonitoredCount = statuses.filter((s) => s === STATUS.UNMONITORED).length;
+
+  // The ring and the "reporting" stat read LIVE vitals only. A fabricated
+  // reading is not evidence that a baby is well, so it must never lift the
+  // score — a ward with every device offline still reads "—", not 100%.
+  const liveStatuses = babies.map((b) => vitalStatus(latestVitals[b.id]));
+  const stableCount = liveStatuses.filter((s) => s === STATUS.STABLE).length;
+  const abnormalCount = liveStatuses.filter((s) => s === STATUS.ABNORMAL).length;
+  const unmonitoredCount = liveStatuses.filter((s) => s === STATUS.UNMONITORED).length;
 
   // Only babies we are actually receiving data for can count toward a health
   // score. Scoring over all babies is what made an offline ward read 100%.
@@ -233,8 +247,8 @@ export default function Dashboard() {
           </p>
           <p className="text-[11px] text-muted mt-0.5 leading-relaxed">
             Simulated values, not measurements — no device is reporting. Drifts
-            every {Math.round(DEMO_DRIFT_MS / 60000)} min, or tap refresh. Live
-            readings replace these automatically.
+            every {DEMO_DRIFT_LABEL}, or tap refresh. The health ring above
+            ignores these. Live readings replace them automatically.
           </p>
         </div>
       )}
@@ -260,7 +274,9 @@ export default function Dashboard() {
         />
         <p className="text-sm text-muted mt-3 text-center">
           {monitoredCount === 0
-            ? 'No devices reporting'
+            ? demoCount > 0
+              ? 'No devices reporting · cards below show demo values'
+              : 'No devices reporting'
             : `${stableCount} of ${monitoredCount} monitored stable`}
         </p>
         {unmonitoredCount > 0 && (

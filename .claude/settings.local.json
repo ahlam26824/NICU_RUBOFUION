@@ -8,7 +8,10 @@
       "Bash('/c/Program Files/IDE/Arduino IDE/resources/app/lib/backend/resources/arduino-cli.exe' compile --fqbn esp32:esp32:makergo_c6_supermini:CDCOnBoot=cdc,PartitionScheme=huge_app --warnings all C:/Users/Administrator/Downloads/NICU_RUBOFUION/nicu-full-system/01-device-firmware/esp32_wroom_standalone)",
       "Bash(grep -viE \"^$|WiFi.h|Wire.h|OneWire|Adafruit|MAX30100|ArduinoJson|Preferences|WebServer|DNSServer|HTTPClient|esp_|in file included|from |^ +\\\\||^ +\\\\^|note:\")",
       "Bash(grep -viE \"^$|in file included|^ +from |^ +\\\\||^ +\\\\^|note:\")",
-      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./package.json'\\).scripts,null,2\\)\\)\")"
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./package.json'\\).scripts,null,2\\)\\)\")",
+      "Bash(npx vite *)",
+      "Bash(curl -s -o /dev/null -w \"anonymous HTTP %{http_code}\\\\n\" \"https://api.github.com/repos/ahlam26824/NICU_RUBOFUION\")",
+      "Bash(grep -iE \"seed_demo|secret|credential|\\\\.sql$\")"
     ]
   }
 }

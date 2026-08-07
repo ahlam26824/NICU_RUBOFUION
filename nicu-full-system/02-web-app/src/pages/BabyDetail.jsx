@@ -3,11 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, Wind, Thermometer, Activity, WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { vitalStatus, STATUS, formatAge } from '../lib/vitalStatus';
-import { DEMO_MODE, DEMO_DRIFT_MS, demoVitalFor } from '../lib/demoVitals';
+import { DEMO_MODE, DEMO_DRIFT_MS, DEMO_DRIFT_LABEL, demoVitalFor } from '../lib/demoVitals';
 import CircularProgress from '../components/CircularProgress';
 import BottomNav from '../components/BottomNav';
 
 const STALENESS_TICK_MS = 30 * 1000;
+
+// Must fire at least as often as the demo bucket rolls over, or fresh demo
+// values would sit computed-but-unrendered. Same rule as the dashboard.
+const TICK_MS = DEMO_MODE
+  ? Math.min(STALENESS_TICK_MS, DEMO_DRIFT_MS)
+  : STALENESS_TICK_MS;
 
 export default function BabyDetail() {
   const { id } = useParams();
@@ -141,8 +147,8 @@ export default function BabyDetail() {
           <p className="text-xs font-semibold text-ink">Demo data</p>
           <p className="text-[11px] text-muted mt-0.5 leading-relaxed">
             Simulated values, not measurements — no device is reporting for this
-            baby. Drifts every {Math.round(DEMO_DRIFT_MS / 60000)} min, or tap
-            refresh. A live reading replaces these automatically.
+            baby. Drifts every {DEMO_DRIFT_LABEL}, or tap refresh. A live
+            reading replaces these automatically.
           </p>
         </div>
       )}
