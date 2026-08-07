@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-bg text-ink font-body;
+}
+
+.card {
+  @apply bg-card rounded-3xl shadow-soft p-5;
+}
+
+.pill {
+  @apply px-4 py-2 rounded-full text-sm font-medium transition-colors;
+}
+
+.pill-active {
+  @apply bg-ink text-white;
+}
+
+.pill-inactive {
+  @apply bg-sage-100 text-muted;
+}
+
+.btn-primary {
+  @apply bg-lime text-ink font-semibold rounded-full py-3.5 px-6 text-center
+         hover:bg-lime-dark transition-colors focus:outline-none focus:ring-2 focus:ring-lime-dark;
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
