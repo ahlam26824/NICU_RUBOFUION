@@ -1,0 +1,23 @@
+# Secrets — .env holds the live Supabase URL and anon key.
+# .env.example is the placeholder version and is meant to be committed.
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

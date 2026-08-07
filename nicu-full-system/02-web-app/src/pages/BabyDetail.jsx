@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Wind, Thermometer, Activity, WifiOff } from 'lucide-react';
+import { ArrowLeft, Heart, Wind, Thermometer, Activity, WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { vitalStatus, STATUS, formatAge } from '../lib/vitalStatus';
+import { DEMO_MODE, DEMO_DRIFT_MS, demoVitalFor } from '../lib/demoVitals';
 import CircularProgress from '../components/CircularProgress';
 import BottomNav from '../components/BottomNav';
 
@@ -12,10 +13,11 @@ export default function BabyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [baby, setBaby] = useState(null);
-  const [vital, setVital] = useState(null);
+  const [liveVital, setLiveVital] = useState(null);
   const [recentAlerts, setRecentAlerts] = useState([]);
   const [error, setError] = useState('');
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
+  const [demoNonce, setDemoNonce] = useState(0);
 
   const loadBaby = useCallback(async () => {
     const { data, error: err } = await supabase
@@ -38,7 +40,7 @@ export default function BabyDetail() {
       .limit(1)
       .maybeSingle();
     if (err) setError(err.message);
-    else setVital(data);
+    else setLiveVital(data);
   }, [id]);
 
   const loadAlerts = useCallback(async () => {
@@ -63,7 +65,7 @@ export default function BabyDetail() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'vitals', filter: `baby_id=eq.${id}` },
         ({ new: row }) =>
-          setVital((prev) =>
+          setLiveVital((prev) =>
             prev &&
             new Date(prev.recorded_at).getTime() >= new Date(row.recorded_at).getTime()
               ? prev
@@ -87,8 +89,19 @@ export default function BabyDetail() {
     return () => clearInterval(t);
   }, []);
 
+  // Demo fill, same rule as the dashboard: substitute only when there is
+  // genuinely nothing live. A real reading always wins.
+  const vital = useMemo(() => {
+    if (!DEMO_MODE || !id) return liveVital;
+    if (vitalStatus(liveVital) !== STATUS.UNMONITORED) return liveVital;
+    return demoVitalFor(id, demoNonce);
+    // tick re-runs this on the staleness timer, which is what makes the
+    // values drift on their own every DEMO_DRIFT_MS.
+  }, [liveVital, id, demoNonce, tick]);
+
   const status = vitalStatus(vital);
   const unmonitored = status === STATUS.UNMONITORED;
+  const isDemo = vital?.is_demo === true;
 
   // null rather than 0 — a missing reading must not paint a 0% ring, which
   // looks identical to a catastrophic desaturation.
@@ -101,12 +114,38 @@ export default function BabyDetail() {
         <ArrowLeft size={22} />
       </button>
 
-      <h1 className="font-display text-2xl font-semibold text-ink mb-1">
-        {baby?.display_name || 'Loading…'}
-      </h1>
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <h1 className="font-display text-2xl font-semibold text-ink">
+          {baby?.display_name || 'Loading…'}
+        </h1>
+        <button
+          onClick={() => {
+            setDemoNonce((n) => n + 1);
+            loadLatestVital();
+            loadAlerts();
+          }}
+          aria-label="Refresh vitals"
+          title="Refresh vitals"
+          className="w-10 h-10 rounded-full bg-card shadow-soft flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+        >
+          <RefreshCw size={17} />
+        </button>
+      </div>
       <p className="text-muted text-sm mb-6">
         Bed {baby?.bed_number || '—'} · Room {baby?.room_number || '—'}
       </p>
+
+      {/* Simulated numbers are labelled before they are shown, not after. */}
+      {isDemo && (
+        <div className="card bg-warn/10 mb-4 py-3 px-4">
+          <p className="text-xs font-semibold text-ink">Demo data</p>
+          <p className="text-[11px] text-muted mt-0.5 leading-relaxed">
+            Simulated values, not measurements — no device is reporting for this
+            baby. Drifts every {Math.round(DEMO_DRIFT_MS / 60000)} min, or tap
+            refresh. A live reading replaces these automatically.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="card bg-alert/10 mb-4">

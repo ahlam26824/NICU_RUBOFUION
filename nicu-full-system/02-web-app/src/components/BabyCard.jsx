@@ -48,6 +48,15 @@ export default function BabyCard({ baby, latestVital, status = STATUS.UNMONITORE
               : 'No signal · never reported'}
           </p>
         )}
+
+        {/* Labelled on the card itself, not only in the page banner — this is
+            where someone actually reads the numbers. */}
+        {latestVital?.is_demo && (
+          <p className="text-xs text-muted mt-2">
+            <span className="font-semibold text-warn">Demo</span> · simulated,
+            no device reporting
+          </p>
+        )}
       </div>
 
       <span className={`w-3 h-3 rounded-full flex-shrink-0 ${dotClass}`} />

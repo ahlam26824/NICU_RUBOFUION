@@ -132,24 +132,30 @@
   Flash as-is. On first boot the device has no stored config, so it hosts
   its own access point:
 
-    1. Join WiFi  "NICU-Setup-XXXX"   (open - no password by default)
+    1. Join WiFi  "NICU-Setup-XXXX"   password: 12345678
     2. A sign-in page opens by itself. If it doesn't, browse to
        http://192.168.4.1
-    3. Pick your WiFi from the list, type its password, paste the Supabase
-       project URL + anon key, set the baby code and device secret. Save.
+    3. Pick your WiFi from the list, type its password, tap Connect.
     4. The device reboots, joins your network and starts posting.
+
+  WiFi is the only thing you type. The Supabase URL, anon key, baby code
+  and device secret are compiled in below, and the phone form keeps them
+  folded away under "Advanced" - you only open that to point a board at a
+  different project or a different baby.
 
   Credentials live in NVS, so they survive power loss and reflashing. Every
   later boot reconnects to that network on its own — the portal stays shut.
 
   To reconfigure: hold BOOT for 3 seconds, at boot or while it's running.
 
-  The setup AP is open (no password) - a prototype default. Set
-  PORTAL_AP_PASSWORD before deploying: the setup form is plain HTTP, so
-  WPA2 on that AP is the only thing encrypting the WiFi password you type
-  into it. NVS is not encrypted either, so treat a physically accessible
-  device as one whose secret is readable - that secret only permits
-  inserting vitals for its own baby, never reading.
+  The setup AP uses WPA2 with the password 12345678 - fine for a bench,
+  guessed first anywhere else. Change PORTAL_AP_PASSWORD before deploying:
+  the setup form is plain HTTP, so WPA2 on that AP is the only thing
+  encrypting the WiFi password you type into it. NVS is not encrypted
+  either, and the device secret is now compiled into this file as well, so
+  treat a physically accessible device - or a shared copy of this sketch -
+  as one whose secret is readable. That secret only permits inserting
+  vitals for its own baby, never reading.
   =========================================================
 */
 
@@ -218,9 +224,10 @@
 // CONFIG — defaults only
 // =========================================================
 // You do NOT have to edit these. On first boot the device hosts its own
-// WiFi access point and serves a setup page where you enter all of it
-// from a phone; the answers are stored in NVS flash and survive both
-// power loss and reflashing this sketch.
+// WiFi access point and serves a setup page that asks for your WiFi and
+// nothing else - the four values below are prefilled into it. Whatever the
+// page submits is stored in NVS flash and survives both power loss and
+// reflashing this sketch.
 //
 // Values here are used only as the initial contents of that form, so
 // filling them in is optional convenience for flashing a batch of
@@ -254,7 +261,7 @@
 // your WiFi password over plain HTTP, so WPA2 on this AP is the only thing
 // encrypting it. Put a password back before this goes near a patient.
 // Must be either "" or 8+ characters - WPA2 has no middle ground.
-#define PORTAL_AP_PASSWORD    ""
+#define PORTAL_AP_PASSWORD    "12345678"
 // BOOT button. GPIO9 on the C6, not GPIO0 as on the WROOM-32 - the C6's
 // boot strap moved, and the SuperMini wires its button to 9 accordingly.
 #define PORTAL_BUTTON_PIN     9
@@ -769,6 +776,28 @@ String htmlEscape(const String& s) {
   return o;
 }
 
+// Phone keyboards habitually append a space after a paste, and copying the
+// project URL out of the Supabase dashboard usually brings a trailing slash
+// with it. Neither is visible in the form, and each one fails in a way that
+// points somewhere else entirely: a stray space in the anon key reads as a
+// 401, in the device secret as a 403, and in the baby code as "no active baby
+// for code". All three look like a wrong value rather than a whitespace
+// problem, so they cost an evening each. Strip it here instead.
+String cleanArg(const String& raw) {
+  String s = raw;
+  s.trim();
+  return s;
+}
+
+// Same, plus the trailing slash. cfg.supabaseUrl has "/rest/v1/rpc/..."
+// appended to it, so one trailing slash yields a double slash in the path,
+// which the API gateway does not route.
+String cleanUrlArg(const String& raw) {
+  String s = cleanArg(raw);
+  while (s.endsWith("/")) s.remove(s.length() - 1);
+  return s;
+}
+
 // Scan results are cached because the root page is not requested once.
 // A phone joining the AP fires several captive-portal probes, every one of
 // which onNotFound() redirects to "/", and scanNetworks() blocks for
@@ -821,21 +850,19 @@ void portalHandleRoot() {
     "<title>NICU Monitor setup</title><style>"
     "body{font-family:system-ui,-apple-system,sans-serif;margin:0;padding:20px;"
     "background:#0f172a;color:#e2e8f0;line-height:1.5}"
-    ".w{max-width:460px;margin:0 auto}h1{font-size:20px;margin:0 0 16px}"
-    ".warn{background:#7f1d1d;border-radius:8px;padding:10px 12px;font-size:13px;"
-    "margin-bottom:20px}"
-    "label{display:block;margin:14px 0 4px;font-size:13px;color:#cbd5e1}"
-    "input,select{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;"
+    ".w{max-width:420px;margin:0 auto}h1{font-size:22px;margin:0 0 6px}"
+    "p.sub{margin:0 0 22px;color:#94a3b8;font-size:14px}"
+    "label{display:block;margin:16px 0 5px;font-size:14px;color:#cbd5e1}"
+    "input,select{width:100%;box-sizing:border-box;padding:12px;border-radius:10px;"
     "border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:16px}"
-    "button{width:100%;margin-top:22px;padding:13px;border:0;border-radius:8px;"
-    "background:#2563eb;color:#fff;font-size:16px;font-weight:600}"
-    "fieldset{border:1px solid #334155;border-radius:8px;margin:22px 0 0;"
-    "padding:0 14px 14px}legend{padding:0 6px;font-size:13px;color:#94a3b8}"
-    ".hint{font-size:12px;color:#64748b;margin-top:4px}"
+    "button{width:100%;margin-top:24px;padding:15px;border:0;border-radius:10px;"
+    "background:#2563eb;color:#fff;font-size:17px;font-weight:600}"
+    "details{margin-top:28px;border-top:1px solid #1e293b;padding-top:12px}"
+    "summary{font-size:13px;color:#64748b}"
+    ".hint{font-size:12px;color:#64748b;margin-top:6px}"
     "</style></head><body><div class=w>"
-    "<h1>NICU Monitor setup</h1>"
-    "<div class=warn><b>Not monitoring.</b> No vitals are recorded until setup "
-    "finishes and the device restarts.</div>"
+    "<h1>Connect to WiFi</h1>"
+    "<p class=sub>Pick your network and the monitor will do the rest.</p>"
     "<form method=POST action=/save>"
     "<label>WiFi network</label>"
     "<select name=ssid onchange=\"document.getElementById('oth').style.display="
@@ -853,8 +880,13 @@ void portalHandleRoot() {
     "<a href=/rescan style=color:#60a5fa>Rescan</a></div>"
     "<label>WiFi password</label>"
     "<input name=pass type=password placeholder='leave blank if open'>"
+    "<button type=submit>Connect</button>"
 
-    "<fieldset><legend>Supabase</legend>"
+    // Everything below is already compiled in and correct for this project,
+    // so it stays folded away. It only needs opening to point a board at a
+    // different Supabase project or a different baby - which is not what
+    // anyone is doing the first time they see this page.
+    "<details><summary>Advanced - Supabase settings</summary>"
     "<label>Project URL</label>"
     "<input name=sburl value='" + htmlEscape(cfg.supabaseUrl) + "'>"
     "<label>Anon key</label>"
@@ -866,8 +898,7 @@ void portalHandleRoot() {
     "<input name=secret type=password placeholder='" +
     String(cfg.deviceSecret.length() ? "stored - blank keeps it"
                                      : "the secret you registered") + "'>"
-    "</fieldset>"
-    "<button type=submit>Save and connect</button>"
+    "</details>"
     "</form></div></body></html>";
 
   portalServer.send(200, "text/html", page);
@@ -888,13 +919,21 @@ void portalHandleSave() {
   cfg.wifiSsid = ssid;
   cfg.wifiPass = portalServer.arg("pass");
 
-  if (portalServer.arg("sburl").length()) cfg.supabaseUrl = portalServer.arg("sburl");
-  if (portalServer.arg("sbkey").length()) cfg.supabaseKey = portalServer.arg("sbkey");
-  if (portalServer.arg("baby").length())  cfg.babyCode    = portalServer.arg("baby");
+  // Note wifiPass above is deliberately NOT trimmed - a space is legal in a
+  // WiFi password, and a wrong one fails loudly anyway (the device never
+  // joins, the portal reopens, serial says so). The four below fail silently,
+  // which is why they get cleaned.
+  if (cleanUrlArg(portalServer.arg("sburl")).length())
+    cfg.supabaseUrl = cleanUrlArg(portalServer.arg("sburl"));
+  if (cleanArg(portalServer.arg("sbkey")).length())
+    cfg.supabaseKey = cleanArg(portalServer.arg("sbkey"));
+  if (cleanArg(portalServer.arg("baby")).length())
+    cfg.babyCode    = cleanArg(portalServer.arg("baby"));
 
   // Blank secret means "keep the stored one", so changing WiFi does not
   // force retyping it.
-  if (portalServer.arg("secret").length()) cfg.deviceSecret = portalServer.arg("secret");
+  if (cleanArg(portalServer.arg("secret")).length())
+    cfg.deviceSecret = cleanArg(portalServer.arg("secret"));
 
   cfg.proven = false;              // unproven until a POST actually succeeds
   configSave(cfg);
@@ -1139,8 +1178,22 @@ bool pushToSupabase(const Reading& r, const Evaluation& e) {
     configMarkProven();
   } else {
     Serial.printf("POST failed (%d): %s\n", code, http.getString().c_str());
-    if (code == 403 || code == 401) {
-      Serial.println("  -> check baby code and device secret against the devices table");
+    // A bare code is not much to debug from, so name the likely cause. These
+    // four cover essentially every failure seen during bring-up.
+    if (code == 401 || code == 403) {
+      Serial.println("  -> 401/403 is the DATABASE rejecting this device.");
+      Serial.println("     Either the anon key is wrong, or baby code/device");
+      Serial.println("     secret do not match the devices row. Check for a");
+      Serial.println("     stray space if you pasted them from a phone.");
+      Serial.printf("     baby_code currently: \"%s\"\n", cfg.babyCode.c_str());
+    } else if (code == 404) {
+      Serial.println("  -> 404 means the URL resolved but the function is not");
+      Serial.println("     there. Either RUN_ALL.sql was never run, or the");
+      Serial.printf("     project URL is wrong: %s\n", cfg.supabaseUrl.c_str());
+    } else if (code < 0) {
+      Serial.println("  -> negative code = never reached Supabase at all.");
+      Serial.println("     DNS, TLS or no route. WiFi can be associated and");
+      Serial.println("     still have no internet - check the router.");
     }
   }
 

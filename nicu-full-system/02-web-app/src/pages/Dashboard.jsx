@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { Bell, Plus } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { Bell, Plus, RefreshCw } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { vitalStatus, STATUS } from '../lib/vitalStatus';
+import { DEMO_MODE, DEMO_DRIFT_MS, fillWithDemoVitals } from '../lib/demoVitals';
 import CircularProgress from '../components/CircularProgress';
 import BabyCard from '../components/BabyCard';
 import BottomNav from '../components/BottomNav';
@@ -20,8 +21,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Bumped on a timer purely to force staleness recalculation.
-  const [, setTick] = useState(0);
+  // Bumped on a timer to force staleness recalculation. The value is read by
+  // the demo-fill memo below, which is how demo vitals drift on their own.
+  const [tick, setTick] = useState(0);
+
+  // Bumped by the Refresh button to re-roll demo values on demand.
+  const [demoNonce, setDemoNonce] = useState(0);
 
   // Lets the realtime handler check membership without re-subscribing every
   // time the vitals map changes.
@@ -149,8 +154,26 @@ export default function Dashboard() {
     return () => supabase.removeChannel(channel);
   }, [babyIdKey, refreshAlertCount]);
 
+  // ---- Demo fill ----
+  // Substitutes plausible values only where a baby is genuinely unmonitored.
+  // Live data always wins, so this cannot mask a real device going quiet.
+  const displayVitals = useMemo(
+    () =>
+      fillWithDemoVitals(
+        babies,
+        latestVitals,
+        demoNonce,
+        (v) => vitalStatus(v) === STATUS.UNMONITORED
+      ),
+    // tick is a dependency on purpose: it re-runs this on the staleness timer,
+    // which is what lets demo values drift on their own every DEMO_DRIFT_MS.
+    [babies, latestVitals, demoNonce, tick]
+  );
+
+  const demoCount = babies.filter((b) => displayVitals[b.id]?.is_demo).length;
+
   // ---- Derived counts ----
-  const statuses = babies.map((b) => vitalStatus(latestVitals[b.id]));
+  const statuses = babies.map((b) => vitalStatus(displayVitals[b.id]));
   const stableCount = statuses.filter((s) => s === STATUS.STABLE).length;
   const abnormalCount = statuses.filter((s) => s === STATUS.ABNORMAL).length;
   const unmonitoredCount = statuses.filter((s) => s === STATUS.UNMONITORED).length;
@@ -178,15 +201,43 @@ export default function Dashboard() {
             <p className="font-display font-semibold text-ink">{profile?.full_name}</p>
           </div>
         </div>
-        <button className="relative w-10 h-10 rounded-full bg-card shadow-soft flex items-center justify-center">
-          <Bell size={18} />
-          {activeAlertCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-alert text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
-              {activeAlertCount}
-            </span>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setDemoNonce((n) => n + 1);
+              loadData();
+            }}
+            aria-label="Refresh vitals"
+            title="Refresh vitals"
+            className="w-10 h-10 rounded-full bg-card shadow-soft flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button className="relative w-10 h-10 rounded-full bg-card shadow-soft flex items-center justify-center">
+            <Bell size={18} />
+            {activeAlertCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-alert text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                {activeAlertCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Fabricated numbers on a patient monitor have to be labelled. This
+          banner is the thing that keeps the demo honest. */}
+      {DEMO_MODE && demoCount > 0 && (
+        <div className="card bg-warn/10 mb-4 py-3 px-4">
+          <p className="text-xs font-semibold text-ink">
+            Demo data · {demoCount} {demoCount === 1 ? 'baby' : 'babies'}
+          </p>
+          <p className="text-[11px] text-muted mt-0.5 leading-relaxed">
+            Simulated values, not measurements — no device is reporting. Drifts
+            every {Math.round(DEMO_DRIFT_MS / 60000)} min, or tap refresh. Live
+            readings replace these automatically.
+          </p>
+        </div>
+      )}
 
       <h1 className="font-display text-2xl font-semibold text-ink mb-4">
         {profile?.role === 'parent' ? 'Your Baby' : 'Today'}
@@ -260,7 +311,7 @@ export default function Dashboard() {
             <BabyCard
               key={baby.id}
               baby={baby}
-              latestVital={latestVitals[baby.id]}
+              latestVital={displayVitals[baby.id]}
               status={statuses[i]}
             />
           ))}

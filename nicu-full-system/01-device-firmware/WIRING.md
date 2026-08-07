@@ -270,8 +270,9 @@ the LDO and the RGB LED vary by clone.
    they're floating rather than leaving you to guess.
 3. Only once the scan is clean, apply the §5c OneWire patch, add the DS18B20 and flash
    `esp32_wroom_standalone/esp32_wroom_standalone.ino`. Nothing needs editing in that sketch —
-   it will host a `NICU-Setup-XXXX` network on first boot so you can enter WiFi and Supabase
-   details from a phone.
+   it will host a `NICU-Setup-XXXX` network on first boot (password `12345678`) so you can pick
+   your WiFi from a phone. WiFi is the only thing you type — the Supabase details are already
+   compiled into the sketch.
 
 **Arduino IDE settings — both sketches:**
 

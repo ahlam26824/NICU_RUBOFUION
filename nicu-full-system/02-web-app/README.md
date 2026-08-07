@@ -21,6 +21,11 @@ dashboard view, enforced by row level security rather than by the UI.
    yet, so that account has no profile row and loads with `profile = null`. It backfills the
    gap. Not needed if you're using the demo logins.
 
+   `supabase/DIAGNOSE_AND_FIX.sql` is for when the dashboard is empty or the ESP32's data
+   isn't arriving. It checks every link in the chain, prints a pass/fail line for each,
+   relinks accounts to babies, and can fake a device POST so you can prove the database half
+   works without touching the hardware. See [When no data arrives](#7-when-no-data-arrives).
+
 4. From **Project Settings > API**, copy the `Project URL` and the `anon public` key
 
 ## 2. Local setup
@@ -42,7 +47,11 @@ npm run dev
 ```
 
 Only ever put the **anon** key here. Anything in `.env` ends up in the built bundle and is
-readable by every visitor.
+readable by every visitor — a `service_role` key would hand full read access to patient data to
+anyone who opens the site.
+
+`.env` is listed in `.gitignore`; `.env.example` holds placeholders and is the one meant to be
+committed. Keep it that way — don't paste real values back into the example file.
 
 ## 3. Creating the first user
 
@@ -73,6 +82,35 @@ middle backend, and the `service_role` key is not used anywhere in this project 
 device can insert fake vitals for its one baby and can read nothing.
 
 See `01-device-firmware/esp32_wroom_standalone/` and the root `README.md` for wiring and flashing.
+
+## 7. When no data arrives
+
+An empty dashboard has two completely different causes, and it's worth spending one minute
+telling them apart before changing anything.
+
+Run `supabase/DIAGNOSE_AND_FIX.sql` and uncomment **PART 5**. That calls `device_push_vitals()`
+with the demo secret — exactly what the firmware calls, minus the firmware.
+
+| PART 5 result | Where the problem is |
+|---|---|
+| `ok=true` and a row appears on the dashboard | The database works. The device never reached it — debug from serial |
+| `ok=true` but the dashboard stays empty | A read/RLS problem. Re-run PART 4 and sign in again |
+| `FAILED auth` | Baby code or device secret doesn't match `devices`. PART 7 resets it |
+
+**If the database is fine, the device is the problem.** At 115200 baud:
+
+| Serial says | Means |
+|---|---|
+| `POST ok` | Working. Data is landing |
+| `POST failed (401/403)` | Anon key, baby code or device secret is wrong — often a space pasted from a phone |
+| `POST failed (404)` | `RUN_ALL.sql` was never run, or the project URL is wrong |
+| `POST failed (-1)` etc. | Never reached Supabase. WiFi can associate and still have no internet |
+| Nothing at all, blank | `USB CDC On Boot` is Disabled. The board is almost certainly fine — `WIRING.md` §8 |
+
+The most common single cause is a **stale reading**, not a missing one: a baby whose last
+reading is over 2 minutes old shows a grey "No signal" dot, not a value. That's deliberate —
+see the status table below. So a device that posted once an hour ago looks identical to one that
+never posted, on the dashboard. The `vitals` table tells you which.
 
 ## Pages
 

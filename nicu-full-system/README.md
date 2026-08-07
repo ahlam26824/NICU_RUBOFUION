@@ -13,6 +13,7 @@ nicu-full-system/
     └── supabase/
         ├── RUN_ALL.sql           <- the whole database, one paste (run this first)
         ├── seed_demo_accounts.sql <- three fixed demo logins + demo baby + device
+        ├── DIAGNOSE_AND_FIX.sql  <- run this when no data arrives
         └── fix_existing_users.sql <- repairs accounts made before RUN_ALL.sql
 ```
 
@@ -207,9 +208,9 @@ rework above — do not skip ahead, the main firmware cannot work without it.
    nothing to fill in** — WiFi and Supabase details are entered from a phone after flashing
    (Step 6).
 
-   The setup network is currently **open**, no password, which keeps the prototype quick to
-   join. Set `PORTAL_AP_PASSWORD` to 8+ characters before this is used anywhere real — see
-   [Security model](#security-model) for what an open setup AP exposes.
+   The setup network is WPA2-protected with the password `12345678` (`PORTAL_AP_PASSWORD`).
+   Set it to `""` if you'd rather join with no password at all — see
+   [Security model](#security-model) for what that exposes.
 
 5. Leave `POWER_MODE` as `POWER_MODE_USB_CONTINUOUS` for the first flash.
 
@@ -227,22 +228,23 @@ rework above — do not skip ahead, the main firmware cannot work without it.
 
 ### Step 6 — Set up WiFi from your phone
 
-No credentials are compiled into the firmware. On a device with nothing stored, the ESP32 hosts
-its own access point and serves a config page.
+**WiFi is the only thing you type.** The Supabase URL, anon key, baby code and device secret are
+compiled in (top of the `.ino`), so the phone form asks for a network and a password and nothing
+else. On a device with no WiFi stored, the ESP32 hosts its own access point and serves that page.
 
 1. On a phone or laptop, join the WiFi network **`NICU-Setup-XXXX`** (the last four hex digits
-   are that board's MAC, so two units on a bench stay distinguishable). It's open by default —
-   no password — unless you set `PORTAL_AP_PASSWORD`.
+   are that board's MAC, so two units on a bench stay distinguishable). Password `12345678`.
 2. A "sign in to network" page should open by itself. If it doesn't, browse to
    **`http://192.168.4.1`**.
 3. Pick your WiFi from the scanned list — or choose *Other / hidden* and type the name — and
    enter its password.
-4. Fill in the Supabase project URL, the **anon** key, the baby code, and the device secret from
-   Step 3. These are remembered, so a later WiFi-only change doesn't mean retyping them.
-5. Save. The device stores everything, reboots, joins your network, and starts posting.
+4. Tap **Connect**. The device stores the network, reboots, joins it, and starts posting.
 
-Serial Monitor prints the AP name, its password (or `none - open network`) and the IP too, if
-you'd rather read it there.
+That's the whole flow. There is an **Advanced** section folded away at the bottom of the page
+holding the four Supabase fields, prefilled from the compiled-in values. You only ever open it to
+point a board at a different project or a different baby — not on a first run.
+
+Serial Monitor prints the AP name, its password and the IP too, if you'd rather read it there.
 
 > The C6 is 2.4 GHz only — WiFi 6 adds throughput and efficiency on that band, not the 5 GHz
 > band. A 5 GHz-only SSID will never appear in the scan and will never connect.
@@ -302,18 +304,43 @@ all. NVS is **not** encrypted by default, so the WiFi password, anon key and dev
 all readable from a dumped flash image. Treat a physically accessible unit as one whose secret is
 already known, and rotate it if a device goes missing.
 
-**The setup AP ships open, with no password — a prototype default that must be changed before
-deployment.** The setup page is plain HTTP on 192.168.4.1, and it can't be HTTPS: there's no
-valid certificate for a private IP, and the browser warning would break the captive-portal sheet
-that makes the page appear on its own. So WPA2 on the AP is the *only* encryption over that form
-— not one layer of several. While it's open, anyone in radio range can read the WiFi password and
-device secret as you submit them, and can reach the page themselves to point the device at another
-server or take it offline. Set `PORTAL_AP_PASSWORD` to 8+ characters to close both. The window is
-provisioning only, but that's 10 minutes per portal entry and unbounded on an unconfigured device.
+**The setup AP uses WPA2 with the password `12345678`** — fine for a bench, not for a ward. The
+setup page is plain HTTP on 192.168.4.1, and it can't be HTTPS: there's no valid certificate for a
+private IP, and the browser warning would break the captive-portal sheet that makes the page appear
+on its own. So WPA2 on the AP is the *only* encryption over that form — not one layer of several,
+and `12345678` is a password an attacker guesses first. Change `PORTAL_AP_PASSWORD` to something
+real before this goes near a patient. Setting it to `""` makes the AP open, which is quicker to
+join and means anyone in radio range can read the WiFi password as you submit it and can reach the
+page themselves to point the device at another server.
+
+Because the anon key, baby code and device secret are now compiled into the firmware rather than
+typed each time, they are in the binary as well as in NVS. That doesn't change the blast radius —
+both were already readable from a dumped flash image — but it does mean **sharing the `.ino` shares
+the device secret**. Rotate it (`DIAGNOSE_AND_FIX.sql` PART 7) before publishing this anywhere.
 
 The WiFi password and device secret are write-only fields — never rendered back into the page.
 
 ---
+
+## When no data arrives
+
+Run `02-web-app/supabase/DIAGNOSE_AND_FIX.sql` in the SQL Editor. It prints a pass/fail line
+for every link in the chain — schema, realtime, devices, account linkage — and **PART 5** fires
+a fake device POST so you can prove the whole database path works without the hardware
+plugged in.
+
+That one test splits the problem in half. If PART 5 returns `ok=true` and a row appears on the
+dashboard, the database is fine and the device never reached it, so the answer is on the serial
+monitor at 115200 baud. If PART 5 fails, the answer is in Supabase. Full table of readings in
+[`02-web-app/README.md` §7](02-web-app/README.md#7-when-no-data-arrives).
+
+Two failure modes that look like a dead device but aren't:
+
+- **Blank Serial Monitor** — `USB CDC On Boot` is Disabled. The firmware is running fine and
+  printing to UART0, which isn't wired to the USB socket. Step 4 covers this.
+- **Grey "No signal" on the dashboard** — a reading older than 2 minutes is shown as no data,
+  never as a value. So a device that posted an hour ago and one that never posted look
+  identical on screen. The `vitals` table distinguishes them.
 
 ## Still manual / missing
 

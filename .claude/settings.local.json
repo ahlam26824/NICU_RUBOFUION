@@ -4,7 +4,11 @@
       "Bash(awk '{n=gsub\\(/\"/,\"\\\\\"\" \\); if \\(n%2==1\\) print NR\": \"$0}' esp32_wroom_standalone.ino)",
       "WebFetch(domain:arduinojson.org)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:docs.espressif.com)"
+      "WebFetch(domain:docs.espressif.com)",
+      "Bash('/c/Program Files/IDE/Arduino IDE/resources/app/lib/backend/resources/arduino-cli.exe' compile --fqbn esp32:esp32:makergo_c6_supermini:CDCOnBoot=cdc,PartitionScheme=huge_app --warnings all C:/Users/Administrator/Downloads/NICU_RUBOFUION/nicu-full-system/01-device-firmware/esp32_wroom_standalone)",
+      "Bash(grep -viE \"^$|WiFi.h|Wire.h|OneWire|Adafruit|MAX30100|ArduinoJson|Preferences|WebServer|DNSServer|HTTPClient|esp_|in file included|from |^ +\\\\||^ +\\\\^|note:\")",
+      "Bash(grep -viE \"^$|in file included|^ +from |^ +\\\\||^ +\\\\^|note:\")",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./package.json'\\).scripts,null,2\\)\\)\")"
     ]
   }
 }
