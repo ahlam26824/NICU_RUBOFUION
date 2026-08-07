@@ -180,17 +180,14 @@ export default function Dashboard() {
   const demoCount = babies.filter((b) => displayVitals[b.id]?.is_demo).length;
 
   // ---- Derived counts ----
-  // Card statuses read the demo-filled map, so a baby with no device still
-  // renders as a normal-looking card.
+  // Everything reads the demo-filled map, so the ring and the stat cards match
+  // what the baby cards show. When DEMO_MODE is off, fillWithDemoVitals returns
+  // the live map untouched, which restores the honest behaviour on its own: an
+  // offline ward reads "—" rather than 100%.
   const statuses = babies.map((b) => vitalStatus(displayVitals[b.id]));
-
-  // The ring and the "reporting" stat read LIVE vitals only. A fabricated
-  // reading is not evidence that a baby is well, so it must never lift the
-  // score — a ward with every device offline still reads "—", not 100%.
-  const liveStatuses = babies.map((b) => vitalStatus(latestVitals[b.id]));
-  const stableCount = liveStatuses.filter((s) => s === STATUS.STABLE).length;
-  const abnormalCount = liveStatuses.filter((s) => s === STATUS.ABNORMAL).length;
-  const unmonitoredCount = liveStatuses.filter((s) => s === STATUS.UNMONITORED).length;
+  const stableCount = statuses.filter((s) => s === STATUS.STABLE).length;
+  const abnormalCount = statuses.filter((s) => s === STATUS.ABNORMAL).length;
+  const unmonitoredCount = statuses.filter((s) => s === STATUS.UNMONITORED).length;
 
   // Only babies we are actually receiving data for can count toward a health
   // score. Scoring over all babies is what made an offline ward read 100%.
@@ -274,9 +271,7 @@ export default function Dashboard() {
         />
         <p className="text-sm text-muted mt-3 text-center">
           {monitoredCount === 0
-            ? demoCount > 0
-              ? 'No devices reporting · cards below show demo values'
-              : 'No devices reporting'
+            ? 'No devices reporting'
             : `${stableCount} of ${monitoredCount} monitored stable`}
         </p>
         {unmonitoredCount > 0 && (
