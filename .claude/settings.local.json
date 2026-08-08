@@ -11,7 +11,13 @@
       "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./package.json'\\).scripts,null,2\\)\\)\")",
       "Bash(npx vite *)",
       "Bash(curl -s -o /dev/null -w \"anonymous HTTP %{http_code}\\\\n\" \"https://api.github.com/repos/ahlam26824/NICU_RUBOFUION\")",
-      "Bash(grep -iE \"seed_demo|secret|credential|\\\\.sql$\")"
+      "Bash(grep -iE \"seed_demo|secret|credential|\\\\.sql$\")",
+      "Bash(mkdir -p /tmp/nicu-run)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --no-sandbox --hide-scrollbars --window-size=430,932 --virtual-time-budget=8000 --screenshot=/tmp/nicu-run/landing.png \"http://localhost:5173/\")",
+      "Bash(export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)",
+      "Bash(npm install *)",
+      "Bash(npx vercel *)",
+      "Bash(grep -iA6 \"alias\")"
     ]
   }
 }
